@@ -2,10 +2,12 @@
 #include <thread>
 #include <iostream>
 #include <mutex>
+#include <atomic>
 
 using namespace std;
 
 mutex consoleMutex;
+atomic<bool> running(true);
 
 // Constructor
 Client::Client()
@@ -88,11 +90,12 @@ bool Client::connectToServer()
 
     return true;
 }
+
 void receiveMessages(SOCKET clientSocket)
 {
     char buffer[1024];
 
-    while (true)
+    while (running)
     {
         ZeroMemory(buffer, sizeof(buffer));
 
@@ -100,55 +103,71 @@ void receiveMessages(SOCKET clientSocket)
             clientSocket,
             buffer,
             sizeof(buffer),
-            0);
+            0
+        );
+
 
         if (bytesReceived <= 0)
         {
-            cout << "\nDisconnected from Server." << endl;
+            lock_guard<mutex> lock(consoleMutex);
+
+            cout << "\nServer disconnected." << endl;
+
+            running = false;
             break;
         }
 
-        //cout << "\nServer : " << buffer << endl;
+
         {
             lock_guard<mutex> lock(consoleMutex);
 
-            cout << "\nServer : " << buffer << endl;
+            cout << "\nServer : "
+                 << buffer
+                 << endl;
         }
+
 
         if (strcmp(buffer, "/exit") == 0)
         {
-            cout << "Server ended the chat." << endl;
+            running = false;
             break;
         }
     }
-}
-// Chat
-void Client::chat()
+}void Client::chat()
 {
-    thread receiveThread(receiveMessages, clientSocket);
+    thread receiver(receiveMessages, clientSocket);
 
-    while (true)
+
+    while (running)
     {
         string message;
 
-        //cout << "You : ";
+
         {
-           lock_guard<mutex> lock(consoleMutex);
-            cout << "You : ";
+            lock_guard<mutex> lock(consoleMutex);
+
+            cout << "\nYou : ";
         }
 
+
         getline(cin, message);
+
 
         send(clientSocket,
              message.c_str(),
              message.length(),
              0);
 
+
         if (message == "/exit")
+        {
+            running = false;
             break;
+        }
     }
 
-    receiveThread.join();
+
+    receiver.join();
 }
 // Cleanup
 void Client::cleanup()
