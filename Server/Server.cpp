@@ -1,5 +1,5 @@
 #include "Server.h"
-
+#include <thread>
 #include <iostream>
 
 using namespace std;
@@ -113,7 +113,15 @@ bool Server::acceptClient()
 {
     cout << "Waiting for client..." << endl;
 
-    clientSocket = accept(
+    thread clientThread(
+    &Server::handleClient,
+    this,
+    clientSocket
+);
+
+
+clientThread.detach();
+    /*clientSocket = accept(
         serverSocket,
         (sockaddr*)&clientAddress,
         &clientSize);
@@ -126,7 +134,7 @@ bool Server::acceptClient()
         WSACleanup();
 
         return false;
-    }
+    }*/
 
     cout << "[OK] Client Connected!" << endl;
 
@@ -136,11 +144,59 @@ bool Server::acceptClient()
 // Chat Function
 void Server::chat()
 {
-    char buffer[1024];
-
     while (true)
     {
-        ZeroMemory(buffer, sizeof(buffer));
+        cout << "Waiting for client..." << endl;
+
+
+        sockaddr_in clientAddress;
+        int clientSize = sizeof(clientAddress);
+
+
+        SOCKET newClientSocket = accept(
+            serverSocket,
+            (sockaddr*)&clientAddress,
+            &clientSize
+        );
+
+
+        if (newClientSocket == INVALID_SOCKET)
+        {
+            cout << "Accept failed!"
+                 << endl;
+
+            continue;
+        }
+
+
+        cout << "[OK] Client Connected!"
+             << endl;
+
+
+        thread clientThread(
+            &Server::handleClient,
+            this,
+            newClientSocket
+        );
+
+
+        clientThread.detach();
+    }
+}
+void Server::handleClient(SOCKET clientSocket)
+{
+    char buffer[1024];
+
+
+    cout << "Client handler started..."
+         << endl;
+
+
+    while(true)
+    {
+
+        ZeroMemory(buffer,sizeof(buffer));
+
 
         int bytesReceived =
             recv(clientSocket,
@@ -148,38 +204,48 @@ void Server::chat()
                  sizeof(buffer),
                  0);
 
-        if (bytesReceived <= 0)
+
+        if(bytesReceived <= 0)
         {
-            cout << "Client disconnected." << endl;
+            cout << "Client disconnected."
+                 << endl;
+
             break;
         }
 
-        cout << "\nClient : " << buffer << endl;
 
-        if (strcmp(buffer, "/exit") == 0)
-        {
-            cout << "Client ended the chat." << endl;
-            break;
-        }
+        cout << "\nClient : "
+             << buffer
+             << endl;
+
+
 
         string reply;
 
+
         cout << "Server : ";
-        getline(cin, reply);
+
+        getline(cin,reply);
+
+
 
         send(clientSocket,
              reply.c_str(),
              reply.length(),
              0);
 
-        if (reply == "/exit")
+
+        if(reply == "/exit")
         {
-            cout << "Closing chat..." << endl;
             break;
         }
-    }
-}
 
+    }
+
+
+    closesocket(clientSocket);
+
+}
 // Cleanup
 void Server::cleanup()
 {

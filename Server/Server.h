@@ -16,6 +16,7 @@ public:
     bool startListening();
     bool acceptClient();
     void chat();
+    void handleClient(SOCKET clientSocket);
     void cleanup();
 
 private:

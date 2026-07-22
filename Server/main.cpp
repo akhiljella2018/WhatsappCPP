@@ -9,7 +9,7 @@ int main()
 
     server.chat();
 
-    server.cleanup();
+    //server.cleanup();
 
     return 0;
 }
