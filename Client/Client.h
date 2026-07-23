@@ -1,8 +1,9 @@
 #ifndef CLIENT_H
 #define CLIENT_H
-
+#pragma once
 #include <winsock2.h>
 #include <string>
+using namespace std;
 
 class Client
 {
@@ -22,6 +23,7 @@ private:
     SOCKET clientSocket;
 
     sockaddr_in serverAddress;
+    string username;
 };
 
 #endif

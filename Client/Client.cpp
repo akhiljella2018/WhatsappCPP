@@ -3,6 +3,8 @@
 #include <iostream>
 #include <mutex>
 #include <atomic>
+#include "../Common/Protocol.h"
+
 
 using namespace std;
 
@@ -42,15 +44,40 @@ bool Client::initialize()
     if (!connectToServer())
         return false;
 
+    // Ask username
+    cout << "Enter Username : ";
+    getline(cin, username);
+
+    // Create LOGIN packet
+Message login;
+
+login.type = MessageType::LOGIN;
+login.sender = username;
+login.receiver = "";
+login.text = "";
+
+string packet = serialize(login);
+
+// Send LOGIN packet
+send(clientSocket,
+     packet.c_str(),
+     static_cast<int>(packet.length()),
+     0);
+
+cout << "[OK] Login packet sent." << endl;
+
+    cout << "[OK] Login packet sent." << endl;
+
     return true;
 }
-
 // Create Socket
 bool Client::createSocket()
 {
-    clientSocket = socket(AF_INET,
-                          SOCK_STREAM,
-                          IPPROTO_TCP);
+    clientSocket = socket(
+        AF_INET,
+        SOCK_STREAM,
+        IPPROTO_TCP
+    );
 
     if (clientSocket == INVALID_SOCKET)
     {
@@ -63,6 +90,7 @@ bool Client::createSocket()
 
     return true;
 }
+
 
 // Connect to Server
 bool Client::connectToServer()
@@ -133,31 +161,43 @@ void receiveMessages(SOCKET clientSocket)
             break;
         }
     }
-}void Client::chat()
+}
+void Client::chat()
 {
     thread receiver(receiveMessages, clientSocket);
-
 
     while (running)
     {
         string message;
 
-
         {
             lock_guard<mutex> lock(consoleMutex);
-
             cout << "\nYou : ";
         }
 
-
         getline(cin, message);
 
+        Message chat;
+
+        if (message == "/exit")
+        {
+            chat.type = MessageType::EXIT;
+        }
+        else
+        {
+            chat.type = MessageType::CHAT;
+        }
+
+        chat.sender = username;
+        chat.receiver = "";
+        chat.text = message;
+
+        string packet = serialize(chat);
 
         send(clientSocket,
-             message.c_str(),
-             message.length(),
+             packet.c_str(),
+             static_cast<int>(packet.length()),
              0);
-
 
         if (message == "/exit")
         {
@@ -165,7 +205,6 @@ void receiveMessages(SOCKET clientSocket)
             break;
         }
     }
-
 
     receiver.join();
 }

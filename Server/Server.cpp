@@ -1,16 +1,18 @@
 #include "Server.h"
-#include <thread>
+#include "../Common/Protocol.h"
 #include <iostream>
+#include <thread>
+#include <algorithm>
 
 using namespace std;
+
 
 // Constructor
 Server::Server()
 {
     serverSocket = INVALID_SOCKET;
-    clientSocket = INVALID_SOCKET;
-    clientSize = sizeof(clientAddress);
 }
+
 
 // Destructor
 Server::~Server()
@@ -18,150 +20,169 @@ Server::~Server()
     cleanup();
 }
 
-// Initialize Winsock and start the server
+
+// Initialize Server
 bool Server::initialize()
 {
     cout << "==================================" << endl;
     cout << "     WhatsApp Server Starting     " << endl;
     cout << "==================================" << endl;
 
-    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+
+    if (WSAStartup(MAKEWORD(2,2), &wsa) != 0)
     {
         cout << "WSAStartup failed!" << endl;
         return false;
     }
 
+
     cout << "[OK] Winsock initialized." << endl;
 
-    if (!createSocket())
+
+    if(!createSocket())
         return false;
 
-    if (!bindSocket())
+
+    if(!bindSocket())
         return false;
 
-    if (!startListening())
+
+    if(!startListening())
         return false;
 
-    if (!acceptClient())
-        return false;
 
     return true;
 }
 
+
+
 // Create Socket
 bool Server::createSocket()
 {
-    serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    serverSocket = socket(
+        AF_INET,
+        SOCK_STREAM,
+        IPPROTO_TCP
+    );
 
-    if (serverSocket == INVALID_SOCKET)
+
+    if(serverSocket == INVALID_SOCKET)
     {
         cout << "Socket creation failed!" << endl;
+
         WSACleanup();
+
         return false;
     }
+
 
     cout << "[OK] Socket created." << endl;
 
     return true;
 }
 
+
+
 // Bind Socket
 bool Server::bindSocket()
 {
+
     serverAddress.sin_family = AF_INET;
+
     serverAddress.sin_port = htons(8080);
+
     serverAddress.sin_addr.s_addr = INADDR_ANY;
 
-    if (bind(serverSocket,
-             (sockaddr*)&serverAddress,
-             sizeof(serverAddress)) == SOCKET_ERROR)
+
+
+    if(bind(
+        serverSocket,
+        (sockaddr*)&serverAddress,
+        sizeof(serverAddress)
+    ) == SOCKET_ERROR)
     {
-        cout << "Bind failed! Error Code: "
-             << WSAGetLastError() << endl;
+
+        cout << "Bind failed Error : "
+             << WSAGetLastError()
+             << endl;
+
 
         closesocket(serverSocket);
+
         WSACleanup();
 
         return false;
     }
 
-    cout << "[OK] Socket bound to Port 8080." << endl;
+
+
+    cout << "[OK] Socket bound to Port 8080."
+         << endl;
+
 
     return true;
 }
+
+
 
 // Listen
 bool Server::startListening()
 {
-    if (listen(serverSocket, SOMAXCONN) == SOCKET_ERROR)
-    {
-        cout << "Listen failed!" << endl;
 
-        closesocket(serverSocket);
-        WSACleanup();
+    if(listen(
+        serverSocket,
+        SOMAXCONN
+    ) == SOCKET_ERROR)
+    {
+
+        cout << "Listen failed!"
+             << endl;
+
 
         return false;
     }
 
-    cout << "[OK] Listening..." << endl;
+
+    cout << "[OK] Listening..."
+         << endl;
+
 
     return true;
 }
 
-// Accept Client
-bool Server::acceptClient()
-{
-    cout << "Waiting for client..." << endl;
-
-    thread clientThread(
-    &Server::handleClient,
-    this,
-    clientSocket
-);
 
 
-clientThread.detach();
-    /*clientSocket = accept(
-        serverSocket,
-        (sockaddr*)&clientAddress,
-        &clientSize);
-
-    if (clientSocket == INVALID_SOCKET)
-    {
-        cout << "Accept failed!" << endl;
-
-        closesocket(serverSocket);
-        WSACleanup();
-
-        return false;
-    }*/
-
-    cout << "[OK] Client Connected!" << endl;
-
-    return true;
-}
-
-// Chat Function
+// Accept multiple clients
 void Server::chat()
 {
-    while (true)
+
+    while(true)
     {
-        cout << "Waiting for client..." << endl;
+
+        cout << "Waiting for client..."
+             << endl;
+
 
 
         sockaddr_in clientAddress;
-        int clientSize = sizeof(clientAddress);
+
+        int clientSize =
+            sizeof(clientAddress);
 
 
-        SOCKET newClientSocket = accept(
-            serverSocket,
-            (sockaddr*)&clientAddress,
-            &clientSize
-        );
+
+        SOCKET newClientSocket =
+            accept(
+                serverSocket,
+                (sockaddr*)&clientAddress,
+                &clientSize
+            );
 
 
-        if (newClientSocket == INVALID_SOCKET)
+
+        if(newClientSocket == INVALID_SOCKET)
         {
+
             cout << "Accept failed!"
                  << endl;
 
@@ -169,8 +190,24 @@ void Server::chat()
         }
 
 
+
         cout << "[OK] Client Connected!"
              << endl;
+
+
+
+        {
+            lock_guard<mutex> lock(clientMutex);
+
+            //clients.push_back(newClientSocket);
+            ClientInfo client;
+
+            client.socket = newClientSocket;
+            client.username = "";
+
+            clients.push_back(client);
+        }
+
 
 
         thread clientThread(
@@ -181,235 +218,160 @@ void Server::chat()
 
 
         clientThread.detach();
+
     }
+
 }
+
+
+
+
+
+// Handle individual client
 void Server::handleClient(SOCKET clientSocket)
 {
     char buffer[1024];
 
+    cout << "Client handler started..." << endl;
 
-    cout << "Client handler started..."
-         << endl;
-
-
-    while(true)
+    while (true)
     {
+        ZeroMemory(buffer, sizeof(buffer));
 
-        ZeroMemory(buffer,sizeof(buffer));
+        int bytesReceived = recv(
+            clientSocket,
+            buffer,
+            sizeof(buffer),
+            0
+        );
 
-
-        int bytesReceived =
-            recv(clientSocket,
-                 buffer,
-                 sizeof(buffer),
-                 0);
-
-
-        if(bytesReceived <= 0)
+        if (bytesReceived <= 0)
         {
-            cout << "Client disconnected."
+            cout << "Client disconnected." << endl;
+            break;
+        }
+
+        // Convert received packet into Message object
+        Message msg = deserialize(buffer);
+
+        // LOGIN Packet
+        if (msg.type == MessageType::LOGIN)
+        {
+            {
+                lock_guard<mutex> lock(clientMutex);
+
+                for (auto &client : clients)
+                {
+                    if (client.socket == clientSocket)
+                    {
+                        client.username = msg.sender;
+                        break;
+                    }
+                }
+            }
+
+            cout << "[LOGIN] "
+                 << msg.sender
+                 << " joined the chat."
                  << endl;
 
-            break;
+            broadcast(
+                msg.sender + " joined the chat.",
+                clientSocket
+            );
         }
 
-
-        cout << "\nClient : "
-             << buffer
-             << endl;
-
-
-
-        string reply;
-
-
-        cout << "Server : ";
-
-        getline(cin,reply);
-
-
-
-        send(clientSocket,
-             reply.c_str(),
-             reply.length(),
-             0);
-
-
-        if(reply == "/exit")
+        // CHAT Packet
+        else if (msg.type == MessageType::CHAT)
         {
-            break;
+            cout << msg.sender
+                 << " : "
+                 << msg.text
+                 << endl;
+
+            broadcast(
+                msg.sender + " : " + msg.text,
+                clientSocket
+            );
         }
 
+        // EXIT Packet
+        else if (msg.type == MessageType::EXIT)
+        {
+            cout << msg.sender
+                 << " left the chat."
+                 << endl;
+
+            broadcast(
+                msg.sender + " left the chat.",
+                clientSocket
+            );
+
+            break;
+        }
     }
 
+    // Remove client from list
+    {
+        lock_guard<mutex> lock(clientMutex);
+
+        clients.erase(
+            remove_if(
+                clients.begin(),
+                clients.end(),
+                [clientSocket](const ClientInfo &client)
+                {
+                    return client.socket == clientSocket;
+                }),
+            clients.end());
+    }
 
     closesocket(clientSocket);
-
 }
+
+// Broadcast message
+void Server::broadcast(
+    string message,
+    SOCKET sender
+)
+{
+    lock_guard<mutex> lock(clientMutex);
+
+    for (const auto& client : clients)
+    {
+        if (client.socket != sender)
+        {
+            send(
+                client.socket,
+                message.c_str(),
+                static_cast<int>(message.length()),
+                0
+            );
+        }
+    }
+}
+
+
+
+
 // Cleanup
 void Server::cleanup()
 {
-    if (clientSocket != INVALID_SOCKET)
-    {
-        closesocket(clientSocket);
-        clientSocket = INVALID_SOCKET;
-    }
 
-    if (serverSocket != INVALID_SOCKET)
+    if(serverSocket != INVALID_SOCKET)
     {
+
         closesocket(serverSocket);
+
         serverSocket = INVALID_SOCKET;
     }
 
+
+
     WSACleanup();
 
-    cout << "Server shutdown completed." << endl;
+
+    cout << "Server shutdown completed."
+         << endl;
+
 }
-
-
-
-/*#include <iostream>
-#include <winsock2.h>
-
-using namespace std;
-
-int main()
-{
-    cout << "==================================" << endl;
-    cout << "   WhatsApp Server Starting..." << endl;
-    cout << "==================================" << endl;
-
-    // Structure to store Winsock information
-    WSADATA wsa;
-
-    // Initialize Winsock version 2.2
-    int result = WSAStartup(MAKEWORD(2, 2), &wsa);
-
-    if (result != 0)
-    {
-        cout << "WSAStartup failed!" << endl;
-        return 1;
-    }
-
-    cout << "Winsock initialized successfully." << endl;
-    // Step 2: Create Socket 
-     SOCKET serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-
-    if (serverSocket == INVALID_SOCKET)
-    {
-        cout << "Socket creation failed!" << endl;
-        WSACleanup();
-        return 1;
-    }
-
-    cout << "Socket created successfully." << endl;
-    
-    // Step 3: Configure Server Address
-    sockaddr_in serverAddress;
-
-    serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = htons(8080);
-    serverAddress.sin_addr.s_addr = INADDR_ANY;
-
-    // Step 4: Bind Socket
-    if (bind(serverSocket,
-             (sockaddr*)&serverAddress,
-             sizeof(serverAddress)) == SOCKET_ERROR)
-    {
-        cout << "Bind failed! Error Code: "
-             << WSAGetLastError() << endl;
-
-        closesocket(serverSocket);
-        WSACleanup();
-        return 1;
-    }
-
-    cout << "Socket bound successfully to Port 8080." << endl;
-
-    // Step 5: Listen for incoming connections
-if (listen(serverSocket, SOMAXCONN) == SOCKET_ERROR)
-{
-    cout << "Listen failed! Error Code: "
-         << WSAGetLastError() << endl;
-
-    closesocket(serverSocket);
-    WSACleanup();
-    return 1;
-}
-
-cout << "Server is listening on Port 8080..." << endl;
-cout << "Waiting for a client to connect..." << endl;
-     // Step 6: Accept Client
-    sockaddr_in clientAddress;
-    int clientSize = sizeof(clientAddress);
-
-    SOCKET clientSocket = accept(
-        serverSocket,
-        (sockaddr*)&clientAddress,
-        &clientSize);
-
-    if (clientSocket == INVALID_SOCKET)
-    {
-        cout << "Accept failed! Error Code: "
-             << WSAGetLastError() << endl;
-
-        closesocket(serverSocket);
-        WSACleanup();
-        return 1;
-    }
-
-    cout << "[OK] Client connected successfully!" << endl;
-
-    char buffer[1024] = {0};
-
-//int bytesReceived = recv(clientSocket, buffer, sizeof(buffer), 0);
-while (true)
-{
-    ZeroMemory(buffer, sizeof(buffer));
-
-    int bytesReceived = recv(clientSocket,
-                             buffer,
-                             sizeof(buffer),
-                             0);
-
-    if (bytesReceived <= 0)
-    {
-        cout << "Client Disconnected." << endl;
-        break;
-    }
-
-    cout << "\nClient : " << buffer << endl;
-
-    string reply;
-
-    cout << "Server : ";
-    getline(cin, reply);
-
-    string message;
-getline(cin, message);
-
-if (message == "exit")
-{
-    send(clientSocket,
-         message.c_str(),
-         message.length(),
-         0);
-
-    break;
-}
-
-    send(clientSocket,
-         reply.c_str(),
-         reply.length(),
-         0);
-}
-
-    // Close client socket
-    closesocket(clientSocket);
-
-    closesocket(serverSocket);
-      // Cleanup Winsock
-    WSACleanup();
-    cout << "Server shutting down..." << endl;
-    return 0;
-}*/
