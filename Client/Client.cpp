@@ -50,17 +50,26 @@ bool Client::initialize()
 
     // Ask username
     cout << "Enter Username : ";
-    getline(cin, username);
+    getline(cin, username); 
 
-    // Create LOGIN packet
-Message login;
+    string password;
 
-login.type = MessageType::LOGIN;
-login.sender = username;
-login.receiver = "";
-login.text = "";
+    cout << "Enter Password : ";
+    getline(cin, password);
+        // Create LOGIN packet
+        Message login;
 
-string packet = serialize(login);
+    login.type = MessageType::LOGIN;
+    login.sender = username;
+    login.receiver = "";
+    login.text = "";
+    login.timestamp = getCurrentTimestamp();
+    login.password = password;  
+    string packet = serialize(login);
+
+    cout << "\nSending LOGIN Packet" << endl;
+    cout << "Username : " << login.sender << endl;
+    cout << "Password : " << login.password << endl;
 
 // Send LOGIN packet
 send(clientSocket,

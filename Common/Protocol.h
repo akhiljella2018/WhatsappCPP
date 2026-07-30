@@ -19,6 +19,7 @@ struct Message
     string receiver = "";
     string text = "";
     string timestamp;
+    string password = "";  
 };
 
 // Convert Message → String

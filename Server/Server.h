@@ -7,6 +7,7 @@
 #include "../Common/Protocol.h"
 #include "ChatHistory.h"
 #include "ClientManager.h"
+#include "Authentication.h"
 
 
 using namespace std;
@@ -26,6 +27,7 @@ private:
 ClientManager clientManager;
 //vector<Message> chatHistory;
 ChatHistory chatHistory;
+Authentication authentication;
     mutex clientMutex;
 public:
 

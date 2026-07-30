@@ -256,13 +256,43 @@ void Server::handleClient(SOCKET clientSocket)
         // LOGIN Packet
 if (msg.type == MessageType::LOGIN)
 {
+    if (!authentication.login(
+            msg.sender,
+            msg.password))
+    {
+        cout << "[LOGIN FAILED] "
+             << msg.sender
+             << endl;
+
+        Message reply;
+
+        reply.type = MessageType::CHAT;
+        reply.sender = "SERVER";
+        reply.receiver = "";
+        reply.timestamp = getCurrentTimestamp();
+        reply.text = "Invalid Username or Password";
+
+        string packet = serialize(reply);
+
+        send(
+            clientSocket,
+            packet.c_str(),
+            static_cast<int>(packet.length()),
+            0
+        );
+
+        closesocket(clientSocket);
+
+        break;
+    }
+
     {
         lock_guard<mutex> lock(clientMutex);
 
         clientManager.setUsername(
-    clientSocket,
-    msg.sender
-);
+            clientSocket,
+            msg.sender
+        );
     }
 
     cout << "[LOGIN] "
@@ -270,10 +300,6 @@ if (msg.type == MessageType::LOGIN)
          << " joined the chat."
          << endl;
 
-    // Send previous chat history only to this client
-    sendChatHistory(clientSocket);
-
-    // Notify everyone else
     Message joinMsg;
 
     joinMsg.type = MessageType::CHAT;
@@ -286,6 +312,8 @@ if (msg.type == MessageType::LOGIN)
         serialize(joinMsg),
         clientSocket
     );
+
+    sendChatHistory(clientSocket);
 
     continue;
 }

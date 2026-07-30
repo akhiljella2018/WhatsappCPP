@@ -7,6 +7,7 @@
 #include <ctime>
 #include <iomanip>
 
+
 using namespace std;
 
 string serialize(const Message& msg)
@@ -37,10 +38,11 @@ string serialize(const Message& msg)
     }
 
     return type + "|" +
-           msg.sender + "|" +
-           msg.receiver + "|" +
-           msg.timestamp + "|" +
-           msg.text + "\n";
+       msg.sender + "|" +
+       msg.receiver + "|" +
+       msg.text + "|" +
+       msg.timestamp + "|" +
+       msg.password + "\n";
 }
 
 Message deserialize(const string& data)
@@ -71,7 +73,7 @@ Message deserialize(const string& data)
         cout << "ERROR : Invalid Packet!" << endl;
         return msg;
     }*/
-    while (parts.size() < 5)
+    while (parts.size() < 6)
 {
     parts.push_back("");
 }
@@ -107,24 +109,23 @@ Message deserialize(const string& data)
     {
         cout << "UNKNOWN MESSAGE TYPE!" << endl;
     }
+    msg.sender = parts.at(1);
+msg.receiver = parts.at(2);
+msg.text = parts.at(3);
+msg.timestamp = parts.at(4);
+msg.password = parts.at(5);
 
-    msg.sender   = parts[1];
-    msg.receiver = parts[2];
-    msg.timestamp = parts[3];
-    msg.text     = parts[4];
-
-    cout << "\nDecoded Message" << endl;
-    cout << "Type     : " << static_cast<int>(msg.type) << endl;
-    cout << "Sender   : " << msg.sender << endl;
-    cout << "Receiver : " << msg.receiver << endl;
-    cout << "Text     : " << msg.text << endl;
+cout << "\nVERIFY AFTER ASSIGNMENT" << endl;
+cout << "Sender    : " << msg.sender << endl;
+cout << "Receiver  : " << msg.receiver << endl;
+cout << "Text      : " << msg.text << endl;
+cout << "Timestamp : " << msg.timestamp << endl;
+cout << "Password  : " << msg.password << endl;
     cout << "===============================\n" << endl;
 
     return msg;
 }
-#include <chrono>
-#include <ctime>
-#include <iomanip>
+
 
 string getCurrentTimestamp()
 {
