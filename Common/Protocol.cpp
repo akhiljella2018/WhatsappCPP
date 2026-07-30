@@ -15,27 +15,39 @@ string serialize(const Message& msg)
     string type;
 
     switch (msg.type)
-    {
-        case MessageType::LOGIN:
-            type = "LOGIN";
-            break;
+{
+    case MessageType::LOGIN:
+        type = "LOGIN";
+        break;
 
-        case MessageType::CHAT:
-            type = "CHAT";
-            break;
+    case MessageType::LOGIN_RESPONSE:
+        type = "LOGIN_RESPONSE";
+        break;
 
-        case MessageType::PRIVATE_MESSAGE:
-            type = "PRIVATE";
-            break;
+    case MessageType::CHAT:
+        type = "CHAT";
+        break;
 
-        case MessageType::USERS:
-            type = "USERS";
-            break;
+    case MessageType::PRIVATE_MESSAGE:
+        type = "PRIVATE";
+        break;
 
-        case MessageType::EXIT:
-            type = "EXIT";
-            break;
-    }
+    case MessageType::USERS:
+        type = "USERS";
+        break;
+
+    case MessageType::SERVER_MESSAGE:
+        type = "SERVER_MESSAGE";
+        break;
+
+    case MessageType::ERROR_MESSAGE:
+        type = "ERROR_MESSAGE";
+        break;
+
+    case MessageType::EXIT:
+        type = "EXIT";
+        break;
+}
 
     return type + "|" +
        msg.sender + "|" +
@@ -86,34 +98,52 @@ Message deserialize(const string& data)
     cout << "EXIT    : " << (parts[0] == "EXIT") << endl;
 
     if (parts[0] == "LOGIN")
-    {
-        msg.type = MessageType::LOGIN;
-    }
-    else if (parts[0] == "CHAT")
-    {
-        msg.type = MessageType::CHAT;
-    }
-    else if (parts[0] == "PRIVATE")
-    {
-        msg.type = MessageType::PRIVATE_MESSAGE;
-    }
-    else if (parts[0] == "USERS")
-    {
-        msg.type = MessageType::USERS;
-    }
-    else if (parts[0] == "EXIT")
-    {
-        msg.type = MessageType::EXIT;
-    }
-    else
-    {
-        cout << "UNKNOWN MESSAGE TYPE!" << endl;
-    }
+{
+    msg.type = MessageType::LOGIN;
+}
+else if (parts[0] == "LOGIN_RESPONSE")
+{
+    msg.type = MessageType::LOGIN_RESPONSE;
+}
+else if (parts[0] == "CHAT")
+{
+    msg.type = MessageType::CHAT;
+}
+else if (parts[0] == "PRIVATE")
+{
+    msg.type = MessageType::PRIVATE_MESSAGE;
+}
+else if (parts[0] == "USERS")
+{
+    msg.type = MessageType::USERS;
+}
+else if (parts[0] == "SERVER_MESSAGE")
+{
+    msg.type = MessageType::SERVER_MESSAGE;
+}
+else if (parts[0] == "ERROR_MESSAGE")
+{
+    msg.type = MessageType::ERROR_MESSAGE;
+}
+else if (parts[0] == "EXIT")
+{
+    msg.type = MessageType::EXIT;
+}
+else
+{
+    cout << "UNKNOWN MESSAGE TYPE!" << endl;
+}
     msg.sender = parts.at(1);
 msg.receiver = parts.at(2);
 msg.text = parts.at(3);
 msg.timestamp = parts.at(4);
 msg.password = parts.at(5);
+while (!msg.password.empty() &&
+       (msg.password.back() == '\n' ||
+        msg.password.back() == '\r'))
+{
+    msg.password.pop_back();
+}
 
 cout << "\nVERIFY AFTER ASSIGNMENT" << endl;
 cout << "Sender    : " << msg.sender << endl;

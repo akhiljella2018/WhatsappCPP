@@ -247,6 +247,10 @@ void Server::handleClient(SOCKET clientSocket)
 
         // Convert received packet into Message object
         Message msg = deserialize(buffer);
+        cout << "\n===== LOGIN DEBUG =====" << endl;
+cout << "Username : [" << msg.sender << "]" << endl;
+cout << "Password : [" << msg.password << "]" << endl;
+cout << "=======================\n" << endl;
         cout << "Server received type = "
      << static_cast<int>(msg.type)
      << endl;
@@ -266,11 +270,11 @@ if (msg.type == MessageType::LOGIN)
 
         Message reply;
 
-        reply.type = MessageType::CHAT;
+        reply.type = MessageType::LOGIN_RESPONSE;
         reply.sender = "SERVER";
         reply.receiver = "";
         reply.timestamp = getCurrentTimestamp();
-        reply.text = "Invalid Username or Password";
+        reply.text = "FAILED";
 
         string packet = serialize(reply);
 
@@ -293,6 +297,22 @@ if (msg.type == MessageType::LOGIN)
             clientSocket,
             msg.sender
         );
+        Message success;
+
+success.type = MessageType::LOGIN_RESPONSE;
+success.sender = "SERVER";
+success.receiver = "";
+success.timestamp = getCurrentTimestamp();
+success.text = "SUCCESS";
+
+string packet = serialize(success);
+
+send(
+    clientSocket,
+    packet.c_str(),
+    static_cast<int>(packet.length()),
+    0
+);
     }
 
     cout << "[LOGIN] "
@@ -302,7 +322,7 @@ if (msg.type == MessageType::LOGIN)
 
     Message joinMsg;
 
-    joinMsg.type = MessageType::CHAT;
+    joinMsg.type = MessageType::SERVER_MESSAGE;
     joinMsg.sender = "SERVER";
     joinMsg.receiver = "";
     joinMsg.timestamp = getCurrentTimestamp();
@@ -416,7 +436,7 @@ if (!disconnectedUser.empty())
 {
     Message leaveMsg;
 
-    leaveMsg.type = MessageType::CHAT;
+    leaveMsg.type = MessageType::SERVER_MESSAGE;
     leaveMsg.sender = "SERVER";
     leaveMsg.receiver = "";
     leaveMsg.timestamp = getCurrentTimestamp();
@@ -477,12 +497,37 @@ void Server::sendPrivateMessage(const Message& msg)
         }
     }
 
-    if (!found)
+   if (!found)
     {
         cout << "[SERVER] User "
              << msg.receiver
              << " not online."
              << endl;
+
+        Message error;
+
+        error.type = MessageType::ERROR_MESSAGE;
+        error.sender = "SERVER";
+        error.receiver = msg.sender;
+        error.timestamp = getCurrentTimestamp();
+        error.text = "User '" + msg.receiver + "' is not online.";
+
+        string packet = serialize(error);
+
+        for (const auto& client : clientManager.getClients())
+        {
+            if (client.username == msg.sender)
+            {
+                send(
+                    client.socket,
+                    packet.c_str(),
+                    static_cast<int>(packet.length()),
+                    0
+                );
+
+                break;
+            }
+        }
     }
 }
 
@@ -529,7 +574,7 @@ void Server::sendChatHistory(SOCKET clientSocket)
     // Send heading
     Message heading;
 
-    heading.type = MessageType::CHAT;
+    heading.type = MessageType::SERVER_MESSAGE;
     heading.sender = "SERVER";
     heading.receiver = "";
     heading.timestamp = getCurrentTimestamp();
@@ -560,7 +605,7 @@ void Server::sendChatHistory(SOCKET clientSocket)
     // Send ending
     Message footer;
 
-    footer.type = MessageType::CHAT;
+    footer.type = MessageType::SERVER_MESSAGE;
     footer.sender = "SERVER";
     footer.receiver = "";
     footer.timestamp = getCurrentTimestamp();

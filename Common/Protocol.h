@@ -6,9 +6,12 @@ using namespace std;
 enum class MessageType
 {
     LOGIN,
+    LOGIN_RESPONSE,      // NEW
     CHAT,
     PRIVATE_MESSAGE,
     USERS,
+    SERVER_MESSAGE,      // NEW
+    ERROR_MESSAGE,       // NEW
     EXIT
 };
 

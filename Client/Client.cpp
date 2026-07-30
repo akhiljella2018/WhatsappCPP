@@ -222,7 +222,36 @@ void receiveMessages(SOCKET clientSocket)
                          << msg.text
                          << endl;
                     break;
-
+                case MessageType::LOGIN_RESPONSE:
+                {
+                    if (msg.text == "SUCCESS")
+                    {
+                        cout << "\n[SERVER] Login Successful." << endl;
+                    }
+                    else
+                    {
+                        cout << "\n[SERVER] Invalid Username or Password." << endl;
+                        running = false;
+                    }
+                    break;
+                }
+                case MessageType::SERVER_MESSAGE:
+                    {
+                        cout << "\n[" << msg.timestamp << "] "
+                             << msg.text
+                             << endl;
+                    
+                        break;
+                    }
+                    
+                    case MessageType::ERROR_MESSAGE:
+                    {
+                        cout << "\n[ERROR] "
+                             << msg.text
+                             << endl;
+                    
+                        break;
+                    }
                 default:
                     break;
             }
