@@ -4,6 +4,10 @@
 #include <mutex>
 #include <atomic>
 #include "../Common/Protocol.h"
+#include <chrono>
+#include <ctime>
+#include <iomanip>
+#include <sstream>
 
 
 using namespace std;
@@ -66,8 +70,6 @@ send(clientSocket,
 
 cout << "[OK] Login packet sent." << endl;
 
-    cout << "[OK] Login packet sent." << endl;
-
     return true;
 }
 // Create Socket
@@ -119,9 +121,27 @@ bool Client::connectToServer()
     return true;
 }
 
+string getCurrentTime()
+{
+    auto now = chrono::system_clock::now();
+
+    time_t currentTime = chrono::system_clock::to_time_t(now);
+
+    tm localTime;
+
+    localtime_s(&localTime, &currentTime);
+
+    stringstream ss;
+
+    ss << put_time(&localTime, "%H:%M:%S");
+
+    return ss.str();
+}
+
 void receiveMessages(SOCKET clientSocket)
 {
     char buffer[1024];
+    string receiveBuffer;
 
     while (running)
     {
@@ -130,10 +150,9 @@ void receiveMessages(SOCKET clientSocket)
         int bytesReceived = recv(
             clientSocket,
             buffer,
-            sizeof(buffer),
+            sizeof(buffer) - 1,
             0
         );
-
 
         if (bytesReceived <= 0)
         {
@@ -145,20 +164,59 @@ void receiveMessages(SOCKET clientSocket)
             break;
         }
 
+        buffer[bytesReceived] = '\0';
 
+        receiveBuffer += buffer;
+
+        while (true)
         {
+            size_t pos = receiveBuffer.find('\n');
+
+            if (pos == string::npos)
+                break;
+
+            string packet = receiveBuffer.substr(0, pos);
+
+            receiveBuffer.erase(0, pos + 1);
+
+            if (packet.empty())
+                continue;
+
+            Message msg = deserialize(packet);
+
             lock_guard<mutex> lock(consoleMutex);
 
-            cout << "\nServer : "
-                 << buffer
-                 << endl;
-        }
+            switch (msg.type)
+            {
+                case MessageType::CHAT:
+                    cout << "\n["
+                         << msg.timestamp
+                         << "] "
+                         << msg.sender
+                         << " : "
+                         << msg.text
+                         << endl;
+                    break;
 
+                case MessageType::PRIVATE_MESSAGE:
+                    cout << "\n[PRIVATE] "
+                         << msg.timestamp
+                         << " "
+                         << msg.sender
+                         << " : "
+                         << msg.text
+                         << endl;
+                    break;
 
-        if (strcmp(buffer, "/exit") == 0)
-        {
-            running = false;
-            break;
+                case MessageType::USERS:
+                    cout << "\n"
+                         << msg.text
+                         << endl;
+                    break;
+
+                default:
+                    break;
+            }
         }
     }
 }
@@ -178,26 +236,51 @@ void Client::chat()
         getline(cin, message);
 
         Message chat;
+        chat.sender = username;
+        chat.timestamp = getCurrentTime();
 
-        if (message == "/exit")
+        if (message.rfind("/msg ", 0) == 0)
+        {
+            chat.type = MessageType::PRIVATE_MESSAGE;
+
+            size_t firstSpace = message.find(' ', 5);
+
+            if (firstSpace == string::npos)
+            {
+                cout << "Usage: /msg <username> <message>" << endl;
+                continue;
+            }
+
+            chat.receiver = message.substr(5, firstSpace - 5);
+            chat.text = message.substr(firstSpace + 1);
+        }
+        else if (message == "/users")
+        {
+            chat.type = MessageType::USERS;
+            chat.receiver = "";
+            chat.text = "";
+        }
+        else if (message == "/exit")
         {
             chat.type = MessageType::EXIT;
+            chat.receiver = "";
+            chat.text = "";
         }
         else
         {
             chat.type = MessageType::CHAT;
+            chat.receiver = "";
+            chat.text = message;
         }
-
-        chat.sender = username;
-        chat.receiver = "";
-        chat.text = message;
 
         string packet = serialize(chat);
 
-        send(clientSocket,
-             packet.c_str(),
-             static_cast<int>(packet.length()),
-             0);
+        send(
+            clientSocket,
+            packet.c_str(),
+            static_cast<int>(packet.length()),
+            0
+        );
 
         if (message == "/exit")
         {
