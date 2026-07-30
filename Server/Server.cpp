@@ -197,16 +197,10 @@ void Server::chat()
 
 
         {
-            lock_guard<mutex> lock(clientMutex);
+    lock_guard<mutex> lock(clientMutex);
 
-            //clients.push_back(newClientSocket);
-            ClientInfo client;
-
-            client.socket = newClientSocket;
-            client.username = "";
-
-            clients.push_back(client);
-        }
+    clientManager.addClient(newClientSocket);
+}
 
 
 
@@ -265,14 +259,10 @@ if (msg.type == MessageType::LOGIN)
     {
         lock_guard<mutex> lock(clientMutex);
 
-        for (auto& client : clients)
-        {
-            if (client.socket == clientSocket)
-            {
-                client.username = msg.sender;
-                break;
-            }
-        }
+        clientManager.setUsername(
+    clientSocket,
+    msg.sender
+);
     }
 
     cout << "[LOGIN] "
@@ -312,13 +302,14 @@ else if (msg.type == MessageType::CHAT)
     {
         lock_guard<mutex> lock(clientMutex);
 
-        chatHistory.push_back(msg);
+        // chatHistory.push_back(msg);
 
-        // Keep only the latest 50 messages
-        if (chatHistory.size() > 50)
-        {
-            chatHistory.erase(chatHistory.begin());
-        }
+        // // Keep only the latest 50 messages
+        // if (chatHistory.size() > 50)
+        // {
+        //     chatHistory.erase(chatHistory.begin());
+        // }
+        chatHistory.addMessage(msg);
     }
 
     // Broadcast to all other clients
@@ -380,7 +371,7 @@ string disconnectedUser;
 {
     lock_guard<mutex> lock(clientMutex);
 
-    for (const auto& client : clients)
+    for (const auto& client : clientManager.getClients())
     {
         if (client.socket == clientSocket)
         {
@@ -389,15 +380,7 @@ string disconnectedUser;
         }
     }
 
-    clients.erase(
-        remove_if(
-            clients.begin(),
-            clients.end(),
-            [clientSocket](const ClientInfo& client)
-            {
-                return client.socket == clientSocket;
-            }),
-        clients.end());
+    clientManager.removeClient(clientSocket);
 }
 
 // Notify everyone
@@ -428,7 +411,7 @@ void Server::broadcast(
 {
     lock_guard<mutex> lock(clientMutex);
 
-    for (const auto& client : clients)
+    for (const auto& client : clientManager.getClients())
     {
         if (client.socket != sender)
         {
@@ -450,7 +433,7 @@ void Server::sendPrivateMessage(const Message& msg)
 
     bool found = false;
 
-    for (const auto& client : clients)
+    for (const auto& client : clientManager.getClients())
     {
         if (client.username == msg.receiver)
         {
@@ -489,7 +472,7 @@ void Server::sendOnlineUsers(SOCKET clientSocket)
 
 bool first = true;
 
-for (const auto& client : clients)
+for (const auto& client : clientManager.getClients())
 {
     if (!client.username.empty())
     {
@@ -534,7 +517,7 @@ void Server::sendChatHistory(SOCKET clientSocket)
     );
 
     // Send every stored message
-    for (const auto& msg : chatHistory)
+    for (const auto& msg : chatHistory.getMessages())
     {
         string packet = serialize(msg);
 
