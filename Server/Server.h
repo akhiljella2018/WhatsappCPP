@@ -19,12 +19,40 @@ private:
     WSADATA wsa;
     SOCKET serverSocket;
     sockaddr_in serverAddress;
-ClientManager clientManager;
-//vector<Message> chatHistory;
-ChatHistory chatHistory;
-Authentication authentication;
-Database database;
+    ClientManager clientManager;
+    //vector<Message> chatHistory;
+    ChatHistory chatHistory;
+    Authentication authentication;
+    Database database;
     mutex clientMutex;
+
+    void processLogin(
+    SOCKET clientSocket,
+    const Message& msg
+);
+
+void processRegister(
+    SOCKET clientSocket,
+    const Message& msg
+);
+
+void processChat(
+    SOCKET clientSocket,
+    const Message& msg
+);
+
+void processPrivateMessage(
+    const Message& msg
+);
+
+void processUsers(
+    SOCKET clientSocket
+);
+
+void processExit(
+    SOCKET clientSocket,
+    const Message& msg
+);
 public:
 
     Server();

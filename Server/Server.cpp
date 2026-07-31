@@ -261,19 +261,304 @@ void Server::handleClient(SOCKET clientSocket)
         // Convert received packet into Message object
         Message msg = deserialize(buffer);
         cout << "\n===== LOGIN DEBUG =====" << endl;
-cout << "Username : [" << msg.sender << "]" << endl;
-cout << "Password : [" << msg.password << "]" << endl;
-cout << "=======================\n" << endl;
+        cout << "Username : [" << msg.sender << "]" << endl;
+        cout << "Password : [" << msg.password << "]" << endl;
+        cout << "=======================\n" << endl;
         cout << "Server received type = "
      << static_cast<int>(msg.type)
      << endl;
         cout << "RAW Packet : " << buffer << endl;
         cout << "Type : " << static_cast<int>(msg.type) << endl;
 
-        // LOGIN Packet
-if (msg.type == MessageType::LOGIN)
+//         if(msg.type == MessageType::REGISTER)
+// {
+//     bool success =
+//         database.registerUser(
+//             msg.sender,
+//             msg.password);
+
+//     Message reply;
+
+//     reply.type = MessageType::LOGIN_RESPONSE;
+//     reply.sender = "SERVER";
+//     reply.timestamp = getCurrentTimestamp();
+
+//     if(success)
+//         reply.text = "REGISTER_SUCCESS";
+//     else
+//         reply.text = "REGISTER_FAILED";
+
+//     send(
+//         clientSocket,
+//         serialize(reply).c_str(),
+//         serialize(reply).length(),
+//         0);
+
+//     continue;
+// }
+if (msg.type == MessageType::REGISTER)
 {
-    if (!authentication.login(
+    processRegister(
+        clientSocket,
+        msg
+    );
+
+    continue;
+}
+        // LOGIN Packet
+        // if (msg.type == MessageType::LOGIN)
+        // {
+        //     if (!database.login(
+        //         msg.sender,
+        //         msg.password))
+        //     {
+        //         cout << "[LOGIN FAILED] "
+        //              << msg.sender
+        //              << endl;
+            
+        //         Message reply;
+            
+        //         reply.type = MessageType::LOGIN_RESPONSE;
+        //         reply.sender = "SERVER";
+        //         reply.receiver = "";
+        //         reply.timestamp = getCurrentTimestamp();
+        //         reply.text = "FAILED";
+            
+        //         string packet = serialize(reply);
+            
+        //         send(
+        //             clientSocket,
+        //             packet.c_str(),
+        //             static_cast<int>(packet.length()),
+        //             0
+        //         );
+            
+        //         closesocket(clientSocket);
+            
+        //         break;
+        //     }
+        
+        //     {
+        //         lock_guard<mutex> lock(clientMutex);
+            
+        //         clientManager.setUsername(
+        //             clientSocket,
+        //             msg.sender
+        //         );
+        //         Message success;
+            
+        // success.type = MessageType::LOGIN_RESPONSE;
+        // success.sender = "SERVER";
+        // success.receiver = "";
+        // success.timestamp = getCurrentTimestamp();
+        // success.text = "SUCCESS";
+            
+        // string packet = serialize(success);
+            
+        // send(
+        //     clientSocket,
+        //     packet.c_str(),
+        //     static_cast<int>(packet.length()),
+        //     0
+        // );
+        //     }
+        
+        //     cout << "[LOGIN] "
+        //          << msg.sender
+        //          << " joined the chat."
+        //          << endl;
+        
+        //     Message joinMsg;
+        
+        //     joinMsg.type = MessageType::SERVER_MESSAGE;
+        //     joinMsg.sender = "SERVER";
+        //     joinMsg.receiver = "";
+        //     joinMsg.timestamp = getCurrentTimestamp();
+        //     joinMsg.text = msg.sender + " joined the chat.";
+        
+        //     broadcast(
+        //         serialize(joinMsg),
+        //         clientSocket
+        //     );
+        
+        //     sendChatHistory(clientSocket);
+        
+        //     continue;
+        // }
+    if (msg.type == MessageType::LOGIN)
+{
+    processLogin(
+        clientSocket,
+        msg
+    );
+    
+{
+    bool success =
+        database.registerUser(
+            msg.sender,
+            msg.password
+        );
+
+    Message reply;
+
+    reply.type = MessageType::LOGIN_RESPONSE;
+    reply.sender = "SERVER";
+    reply.timestamp = getCurrentTimestamp();
+
+    if (success)
+    {
+        cout << "[REGISTER] "
+             << msg.sender
+             << " registered successfully."
+             << endl;
+
+        reply.text = "REGISTER_SUCCESS";
+    }
+    else
+    {
+        cout << "[REGISTER FAILED] "
+             << msg.sender
+             << endl;
+
+        reply.text = "REGISTER_FAILED";
+    }
+
+    string packet = serialize(reply);
+
+    send(
+        clientSocket,
+        packet.c_str(),
+        static_cast<int>(packet.length()),
+        0
+    );
+}
+
+    continue;
+}
+        // CHAT Packet
+    else if (msg.type == MessageType::CHAT)
+    {
+        cout << msg.sender
+             << " : "
+             << msg.text
+             << endl;
+
+        // Save message into chat history
+        {
+            lock_guard<mutex> lock(clientMutex);
+
+            // chatHistory.push_back(msg);
+
+            // // Keep only the latest 50 messages
+            // if (chatHistory.size() > 50)
+            // {
+            //     chatHistory.erase(chatHistory.begin());
+            // }
+            chatHistory.addMessage(msg);
+        }
+
+        // Broadcast to all other clients
+        broadcast(
+            serialize(msg),
+            clientSocket
+        );
+    }
+
+            // EXIT Packet
+            else if (msg.type == MessageType::PRIVATE_MESSAGE)
+    {
+        cout << "[PRIVATE] "
+             << msg.sender
+             << " -> "
+             << msg.receiver
+             << " : "
+             << msg.text
+             << endl;
+
+        sendPrivateMessage(msg);
+
+        continue;
+    }
+
+    else if (msg.type == MessageType::USERS)
+    {
+        sendOnlineUsers(clientSocket);
+        continue;
+    }
+
+    else if (msg.type == MessageType::EXIT)
+    {
+        cout << "[EXIT] "
+             << msg.sender
+             << " left the chat."
+             << endl;
+
+        Message exitMsg;
+
+        exitMsg.type = MessageType::CHAT;
+        exitMsg.sender = "SERVER";
+        exitMsg.receiver = "";
+        exitMsg.text = msg.sender + " left the chat.";
+
+        broadcast(
+            serialize(exitMsg),
+            clientSocket
+        );
+
+        break;
+    }
+        }
+
+        // Remove client from list
+        // Save username before removing client
+    string disconnectedUser;
+
+    {
+        lock_guard<mutex> lock(clientMutex);
+
+        for (const auto& client : clientManager.getClients())
+        {
+            if (client.socket == clientSocket)
+            {
+                disconnectedUser = client.username;
+                break;
+            }
+        }
+
+        clientManager.removeClient(clientSocket);
+    }
+
+    // Notify everyone
+    if (!disconnectedUser.empty())
+    {
+        Message leaveMsg;
+
+        leaveMsg.type = MessageType::SERVER_MESSAGE;
+        leaveMsg.sender = "SERVER";
+        leaveMsg.receiver = "";
+        leaveMsg.timestamp = getCurrentTimestamp();
+        leaveMsg.text = disconnectedUser + " left the chat.";
+
+        broadcast(
+            serialize(leaveMsg),
+            INVALID_SOCKET
+        );
+    }
+
+    closesocket(clientSocket);
+}
+
+// void Server::processRegister(
+//     SOCKET clientSocket,
+//     const Message& msg
+// )
+
+void Server::processLogin(
+    SOCKET clientSocket,
+    const Message& msg
+)
+{
+    if (!database.login(
             msg.sender,
             msg.password))
     {
@@ -285,7 +570,6 @@ if (msg.type == MessageType::LOGIN)
 
         reply.type = MessageType::LOGIN_RESPONSE;
         reply.sender = "SERVER";
-        reply.receiver = "";
         reply.timestamp = getCurrentTimestamp();
         reply.text = "FAILED";
 
@@ -300,7 +584,7 @@ if (msg.type == MessageType::LOGIN)
 
         closesocket(clientSocket);
 
-        break;
+        return;
     }
 
     {
@@ -310,34 +594,33 @@ if (msg.type == MessageType::LOGIN)
             clientSocket,
             msg.sender
         );
-        Message success;
-
-success.type = MessageType::LOGIN_RESPONSE;
-success.sender = "SERVER";
-success.receiver = "";
-success.timestamp = getCurrentTimestamp();
-success.text = "SUCCESS";
-
-string packet = serialize(success);
-
-send(
-    clientSocket,
-    packet.c_str(),
-    static_cast<int>(packet.length()),
-    0
-);
     }
 
     cout << "[LOGIN] "
          << msg.sender
-         << " joined the chat."
+         << " joined."
          << endl;
+
+    Message reply;
+
+    reply.type = MessageType::LOGIN_RESPONSE;
+    reply.sender = "SERVER";
+    reply.timestamp = getCurrentTimestamp();
+    reply.text = "SUCCESS";
+
+    string packet = serialize(reply);
+
+    send(
+        clientSocket,
+        packet.c_str(),
+        static_cast<int>(packet.length()),
+        0
+    );
 
     Message joinMsg;
 
-    joinMsg.type = MessageType::SERVER_MESSAGE;
+    joinMsg.type = MessageType::CHAT;
     joinMsg.sender = "SERVER";
-    joinMsg.receiver = "";
     joinMsg.timestamp = getCurrentTimestamp();
     joinMsg.text = msg.sender + " joined the chat.";
 
@@ -347,123 +630,51 @@ send(
     );
 
     sendChatHistory(clientSocket);
-
-    continue;
 }
-
-        // CHAT Packet
-else if (msg.type == MessageType::CHAT)
+void Server::processRegister(
+    SOCKET clientSocket,
+    const Message& msg
+)
 {
-    cout << msg.sender
-         << " : "
-         << msg.text
-         << endl;
+    bool success = database.registerUser(
+        msg.sender,
+        msg.password
+    );
 
-    // Save message into chat history
+    Message reply;
+
+    reply.type = MessageType::LOGIN_RESPONSE;
+    reply.sender = "SERVER";
+    reply.receiver = "";
+    reply.timestamp = getCurrentTimestamp();
+
+    if (success)
     {
-        lock_guard<mutex> lock(clientMutex);
+        cout << "[REGISTER] "
+             << msg.sender
+             << " registered successfully."
+             << endl;
 
-        // chatHistory.push_back(msg);
-
-        // // Keep only the latest 50 messages
-        // if (chatHistory.size() > 50)
-        // {
-        //     chatHistory.erase(chatHistory.begin());
-        // }
-        chatHistory.addMessage(msg);
+        reply.text = "REGISTER_SUCCESS";
     }
-
-    // Broadcast to all other clients
-    broadcast(
-        serialize(msg),
-        clientSocket
-    );
-}
-
-        // EXIT Packet
-        else if (msg.type == MessageType::PRIVATE_MESSAGE)
-{
-    cout << "[PRIVATE] "
-         << msg.sender
-         << " -> "
-         << msg.receiver
-         << " : "
-         << msg.text
-         << endl;
-
-    sendPrivateMessage(msg);
-
-    continue;
-}
-
-else if (msg.type == MessageType::USERS)
-{
-    sendOnlineUsers(clientSocket);
-    continue;
-}
-
-else if (msg.type == MessageType::EXIT)
-{
-    cout << "[EXIT] "
-         << msg.sender
-         << " left the chat."
-         << endl;
-
-    Message exitMsg;
-
-    exitMsg.type = MessageType::CHAT;
-    exitMsg.sender = "SERVER";
-    exitMsg.receiver = "";
-    exitMsg.text = msg.sender + " left the chat.";
-
-    broadcast(
-        serialize(exitMsg),
-        clientSocket
-    );
-
-    break;
-}
-    }
-
-    // Remove client from list
-    // Save username before removing client
-string disconnectedUser;
-
-{
-    lock_guard<mutex> lock(clientMutex);
-
-    for (const auto& client : clientManager.getClients())
+    else
     {
-        if (client.socket == clientSocket)
-        {
-            disconnectedUser = client.username;
-            break;
-        }
+        cout << "[REGISTER FAILED] "
+             << msg.sender
+             << endl;
+
+        reply.text = "REGISTER_FAILED";
     }
 
-    clientManager.removeClient(clientSocket);
-}
+    string packet = serialize(reply);
 
-// Notify everyone
-if (!disconnectedUser.empty())
-{
-    Message leaveMsg;
-
-    leaveMsg.type = MessageType::SERVER_MESSAGE;
-    leaveMsg.sender = "SERVER";
-    leaveMsg.receiver = "";
-    leaveMsg.timestamp = getCurrentTimestamp();
-    leaveMsg.text = disconnectedUser + " left the chat.";
-
-    broadcast(
-        serialize(leaveMsg),
-        INVALID_SOCKET
+    send(
+        clientSocket,
+        packet.c_str(),
+        static_cast<int>(packet.length()),
+        0
     );
 }
-
-closesocket(clientSocket);
-}
-
 // Broadcast message
 void Server::broadcast(
     string message,

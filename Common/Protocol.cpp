@@ -24,6 +24,9 @@ string serialize(const Message& msg)
         type = "LOGIN_RESPONSE";
         break;
 
+    case MessageType::REGISTER:
+        type = "REGISTER";
+        break;
     case MessageType::CHAT:
         type = "CHAT";
         break;
@@ -104,6 +107,10 @@ Message deserialize(const string& data)
 else if (parts[0] == "LOGIN_RESPONSE")
 {
     msg.type = MessageType::LOGIN_RESPONSE;
+}
+else if(parts[0] == "REGISTER")
+{
+    msg.type = MessageType::REGISTER;
 }
 else if (parts[0] == "CHAT")
 {

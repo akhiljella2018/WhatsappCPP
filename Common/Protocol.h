@@ -7,6 +7,7 @@ enum class MessageType
 {
     LOGIN,
     LOGIN_RESPONSE,      // NEW
+    REGISTER,
     CHAT,
     PRIVATE_MESSAGE,
     USERS,
