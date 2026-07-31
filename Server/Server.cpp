@@ -48,8 +48,21 @@ bool Server::initialize()
 
 
     if(!startListening())
-        return false;
+    return false;
 
+        // Connect to SQLite database
+        if (!database.connect("Data/whatsapp.db"))
+        {
+            return false;
+        }
+
+        // Create tables if they don't exist
+        if (!database.createTables())
+        {
+            return false;
+        }
+
+        return true;
 
     return true;
 }
@@ -126,29 +139,29 @@ bool Server::bindSocket()
 
 
 // Listen
-bool Server::startListening()
-{
-
-    if(listen(
-        serverSocket,
-        SOMAXCONN
-    ) == SOCKET_ERROR)
+    bool Server::startListening()
     {
 
-        cout << "Listen failed!"
-             << endl;
+        if(listen(
+            serverSocket,
+            SOMAXCONN
+        ) == SOCKET_ERROR)
+        {
+
+            cout << "Listen failed!"
+                << endl;
 
 
-        return false;
+            return false;
+        }
+
+
+        cout << "[OK] Listening..."
+            << endl;
+
+
+        return true;
     }
-
-
-    cout << "[OK] Listening..."
-         << endl;
-
-
-    return true;
-}
 
 
 
@@ -633,7 +646,7 @@ void Server::cleanup()
         serverSocket = INVALID_SOCKET;
     }
 
-
+    database.disconnect();
 
     WSACleanup();
 

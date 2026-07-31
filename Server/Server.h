@@ -8,6 +8,7 @@
 #include "ChatHistory.h"
 #include "ClientManager.h"
 #include "Authentication.h"
+#include "Database.h"
 
 
 using namespace std;
@@ -18,16 +19,11 @@ private:
     WSADATA wsa;
     SOCKET serverSocket;
     sockaddr_in serverAddress;
-// struct ClientInfo
-// {
-//     SOCKET socket;
-//     string username;
-// };
-
 ClientManager clientManager;
 //vector<Message> chatHistory;
 ChatHistory chatHistory;
 Authentication authentication;
+Database database;
     mutex clientMutex;
 public:
 
